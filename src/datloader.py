@@ -132,4 +132,7 @@ class Data(pd.DataFrame):
         else:
             print(f"[Error] 'Invalid {resp_type}'; only 'numerical', 'count', and 'categorical' are allowed.")
         print(model.summary())
+        if hasattr(model, "llf"):
+            print(f"Null Deviance: {(-2 * model.llnull):.4f}, Degrees of Freedom: {int(model.nobs-1)}")
+            print(f"Residual Deviance: {(-2 * model.llf):.4f}, Degrees of Freedom: {int(model.df_resid)}")
         return model
