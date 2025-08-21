@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+import matplotlib.pyplot as plt
 from scipy import stats
 
 class Data(pd.DataFrame):
@@ -79,14 +80,53 @@ class Data(pd.DataFrame):
 
         return df
 
-    def summary(self):
+    def summary(self, col:list = None):
         """
         Summary of the dataset
         """
-        print("\n Summary:")
-        print(self.info())
-        print("\n NA:")
-        print(self.isnull().sum())
+        
+        if col is None:
+            col = list(range(min(6, self.shape[1])))
+        
+        nrows = (len(col) + 2) // 3
+        fig, axes = plt.subplots(nrows = nrows, ncols = 3, figsize = (15, 5*nrows))
+        if len(col) != 1:
+            axes = axes.flatten() 
+        else: 
+            axes = [axes]
+
+        for i, idx in enumerate(col):
+            y = self.iloc[:, idx]
+            ax = axes[i]
+            nlvl = len(y.unique())
+
+            if y.dtype == "category":
+                cnt = y.value_counts()
+                colors = ['#A6B0BE', '#B2B8A3', '#C0C9CC']
+                if nlvl > 3:
+                    others = y.value_counts()[2:].sum() 
+                    cnt = cnt[:2]
+                    cnt.loc['Others'] = others
+                else:
+                    colors = colors[:nlvl]
+                ax.pie(cnt, labels = cnt.index, autopct = '%1.1f%%', colors = colors)
+                ax.set_ylabel('')
+            
+            else: 
+                if nlvl < 10 and all(np.diff(np.sort(y.unique())) == 1):
+                    bins = nlvl
+                else:
+                    bins = 'auto'
+                ax.hist(y, bins = bins, color = '#A6B0BE', edgecolor = '#C0C9CC')
+            ax.set_title(f"{y.name}")
+            
+        for i in range(len(col), len(axes)):
+            fig.delaxes(axes[i])
+        
+        plt.tight_layout()
+        plt.show()
+
+
 
     def _to_design(self, response: str) -> np.ndarray:
         df = self.drop(response, axis = 1)
@@ -140,7 +180,6 @@ class Data(pd.DataFrame):
             print(f"Residual Deviance: {model.deviance:.4f}, Degrees of Freedom: {int(model.df_resid)}")
         return _ModelInfo(model, X, y, response, resp_type)
 
-import matplotlib.pyplot as plt
 class _ModelInfo:
     def __init__(self, model, X, y, response: str, resp_type: str):
         self.model = model
@@ -173,8 +212,8 @@ class _ModelInfo:
             resid = self.resid
             resid_type = "Residuals"
         lowess = sm.nonparametric.lowess(resid, fitted, frac = 2/3)
-        ax.plot(lowess[:, 0], lowess[:, 1], color = "red", linestyle = '-', linewidth = 2)
-        ax.scatter(fitted, resid, alpha = 0.7)
+        ax.plot(lowess[:, 0], lowess[:, 1], color = "#980417", linestyle = '-', linewidth = 2)
+        ax.scatter(fitted, resid, alpha = 0.7, color = '#B2B8A3')
         ax.axhline(0, color = "gray", linestyle = "--")
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel(f"{resid_type}")
@@ -197,10 +236,10 @@ class _ModelInfo:
         n = len(q_samp)
         probs = (np.arange(1, n + 1) - 0.5) / n
         q_theo = stats.norm.ppf(0.5 + 0.5 * probs)
-        ax.scatter(q_theo, q_samp, alpha = 0.7)
+        ax.scatter(q_theo, q_samp, alpha = 0.7, color = '#B2B8A3')
         q1 = (np.percentile(q_theo, 25), np.percentile(q_samp, 25))
         q3 = (np.percentile(q_theo, 75), np.percentile(q_samp, 75))
-        ax.axline(q1, q3, color = "gray", linestyle = '--', linewidth = 2)
+        ax.axline(q1, q3, color = "#C0C9CC", linestyle = '--', linewidth = 2)
         ax.set_title(f"Normal Q-Q Plot of {resid_type}")
         ax.set_xlabel("Theoretical Quantiles")
         ax.set_ylabel(f"{resid_type}")
@@ -221,8 +260,8 @@ class _ModelInfo:
             resid_type = "Sqrt. Abs. Std. Residuals"
 
         lowess = sm.nonparametric.lowess(resid, fitted, frac = 2/3)
-        ax.plot(lowess[:, 0], lowess[:, 1], color = "red", linestyle = '-', linewidth = 2)
-        ax.scatter(fitted, resid, alpha = 0.7)
+        ax.plot(lowess[:, 0], lowess[:, 1], color = "#980417", linestyle = '-', linewidth = 2)
+        ax.scatter(fitted, resid, alpha = 0.7, color = '#B2B8A3')
         ax.set_xlabel("Fitted Values")
         ax.set_ylabel(f"{resid_type}")
         ax.set_title(f"Scale-Location Plot of {resid_type}")
@@ -242,10 +281,10 @@ class _ModelInfo:
             resid = self.resid / np.sqrt(self.scale * (1 - self.leverage))
             resid_type = "Std. Residuals"
         lowess = sm.nonparametric.lowess(resid, leverage, frac = 2/3)
-        ax.plot(lowess[:, 0], lowess[:, 1], color = "red", linestyle = '-', linewidth = 2)
-        ax.scatter(leverage, resid, alpha = 0.7)
-        ax.axhline(0, color = "gray", linestyle = "--")
-        ax.axvline(0, color = "gray", linestyle = "--")
+        ax.plot(lowess[:, 0], lowess[:, 1], color = "#980417", linestyle = '-', linewidth = 2)
+        ax.scatter(leverage, resid, alpha = 0.7, color = '#B2B8A3')
+        ax.axhline(0, color = "#C0C9CC", linestyle = "--")
+        ax.axvline(0, color = "#C0C9CC", linestyle = "--")
         ax.set_title(f"{resid_type} vs Leverage")
         ax.set_xlabel("Leverage")
         ax.set_ylabel(f"{resid_type}")
@@ -261,4 +300,25 @@ class _ModelInfo:
         self.resid_vs_leverage(axes[1, 1])
         plt.tight_layout()
         plt.show()
+    
+    def out(self, path = "model_result.csv"):
+        df = self.model.summary2().tables[1]
+        
+        if self.model.summary2().tables[0].iloc[0, 1] == 'GLM':
+            if self.model.summary2().tables[0].iloc[1, 1] == 'Logit':
+                ylab = 'Odds Ratio'
+            if self.model.summary2().tables[0].iloc[1, 1] == 'Log':
+                ylab = 'Rate Ratio'
+            df[ylab] = np.exp(df['Coef.'])
+            df['CI Lower'] = np.exp(df['[0.025'])
+            df['CI Upper'] = np.exp(df['0.975]'])
+        else:
+            ylab = 'Coefficient'
+            df[ylab] = df['Coef.']
+            df['CI Lower'] = df['[0.025']
+            df['CI Upper'] = df['0.975]']
+        df = df.drop(columns = ['[0.025', '0.975]'])
+        
+        print(df)
+        return df.to_csv(path, index = True)
     
